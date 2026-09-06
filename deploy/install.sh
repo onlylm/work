@@ -4,6 +4,7 @@ set -Eeuo pipefail
 INSTALL_DIR=${INSTALL_DIR:-/opt/personal-workbench}
 REPO_URL=${REPO_URL:-https://github.com/onlylm/work.git}
 APP_PORT=${APP_PORT:-8790}
+NPM_REGISTRY=${NPM_REGISTRY:-https://registry.npmmirror.com}
 WORKBENCH_DOMAIN=${WORKBENCH_DOMAIN:-}
 
 if [[ ${EUID} -ne 0 ]]; then
@@ -39,6 +40,7 @@ if [[ ! -f .env ]]; then
   umask 077
   cat > .env <<EOF
 APP_PORT=${APP_PORT}
+NPM_REGISTRY=${NPM_REGISTRY}
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 AUTH_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 INVENTORY_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')

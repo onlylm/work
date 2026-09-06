@@ -2,7 +2,12 @@ FROM node:24-alpine AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN pnpm config set registry "${NPM_REGISTRY}" \
+    && pnpm config set fetch-retries 5 \
+    && pnpm config set fetch-retry-mintimeout 10000 \
+    && pnpm config set fetch-retry-maxtimeout 120000 \
+    && pnpm install --frozen-lockfile --reporter=append-only
 FROM node:24-alpine AS build
 WORKDIR /app
 RUN corepack enable
