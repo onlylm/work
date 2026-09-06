@@ -1,15 +1,51 @@
-# 个人经营工作台
+# 个人经营工作台 v0.2.0
 
-面向个人经营者的客户、业务、资金、库存、交付与提醒工作台。当前为第一版开发基线，包含响应式工作台、快速记录确认交互、PostgreSQL/Drizzle 数据模型、美元移动加权成本测试和 Docker 一键部署。
+个人经营者使用的客户、业务、资金、商品、待办和常用网站管理系统。本版本已移除硬编码演示数据，页面读写 PostgreSQL，并加入管理员登录保护。
 
-## 本地运行
+## 已实现
+
+- 自动初始化单一管理员，bcrypt 哈希保存密码。
+- JWT 签名的 HttpOnly、SameSite 会话 Cookie；生产环境仅通过 HTTPS 发送。
+- 登录失败限流：同一账号 15 分钟内最多失败 5 次。
+- 所有业务页面及服务端写操作校验登录会话和 `workspace_id`。
+- 客户资料新增、列表与最近业务信息。
+- 统一业务录入、收款、成本、直接支出、状态和利润计算。
+- 成本留空时显示“待核算”，不按零成本虚增利润。
+- 业务收款自动生成关联的人民币资金流水。
+- 人民币收支记录。
+- 美元充值、消费、余额与移动加权平均成本，事务内加锁防止并发错账。
+- 商品基础资料、待办事项、常用网站的新增和列表。
+- 会员类业务筛选、真实数据经营汇总报表。
+- 本地规则自然语言快速记录，必须预览确认后才写入。
+- 所有关键新增与待办完成动作保留审计基础。
+- Docker Compose、PostgreSQL 迁移、每日备份及共享 Caddy 一键部署。
+
+账号库存加密交付、会员精确到期时间和完整库存批次尚未开放；界面会明确显示未启用，不会提供不安全的半成品操作。
+
+## 一键部署或升级
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onlylm/work/main/deploy/install.sh \
+  | WORKBENCH_DOMAIN=www.bugan.cn bash
+```
+
+脚本自动复用服务器现有 `shuku`/`NIMAIL` Caddy，不新增 80/443 监听；应用仅绑定 `127.0.0.1:8790`。首次成功部署会在终端显示管理员邮箱和随机密码，请立即妥善保存。
+
+验证：
+
+```bash
+curl https://www.bugan.cn/api/health
+```
+
+## 本地开发
 
 ```bash
 pnpm install
+pnpm db:migrate
 pnpm dev
 ```
 
-访问 `http://localhost:3000`。提交前运行：
+需要配置 `DATABASE_URL`、`AUTH_SECRET`、`ADMIN_EMAIL` 和 `ADMIN_PASSWORD`。提交前运行：
 
 ```bash
 pnpm lint
@@ -18,36 +54,4 @@ pnpm test
 pnpm build
 ```
 
-## 一键部署
-
-有独立域名时（推荐）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/onlylm/work/main/deploy/install.sh | sudo WORKBENCH_DOMAIN=work.example.com bash
-```
-
-暂时只部署、不配置公网域名：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/onlylm/work/main/deploy/install.sh | sudo bash
-```
-
-默认仅监听 `127.0.0.1:8790`，不会与 NIMAIL 的 `127.0.0.1:8788` 冲突，也不会抢占 `shuku`/NIMAIL 共用的 80、443。提供域名后，安装器会自动发现现有 Caddy 的 Docker 网络及配置目录，接入共享网关并启用 HTTPS。
-
-首次安装自动生成 `/opt/personal-workbench/.env`，密钥不会提交 Git。PostgreSQL 使用独立数据卷，备份容器每天生成压缩备份并保留 14 天。
-
-## 安全约束
-
-- 金额以整数分保存，美元使用定点数，时间使用带时区时间戳。
-- 每条业务数据包含 `workspace_id`；成本缺失时利润为 `null`（待核算）。
-- 敏感库存只保存密文及去重摘要，密钥仅来自环境变量。
-- 自然语言录入先预览确认，再通过事务写入。
-- 本项目与 `shuku`、`NIMAIL` 不共享业务数据。
-
-## 依赖许可
-
-Next.js/React/Tailwind/Zod/jose/bcryptjs/Vitest（MIT），Drizzle ORM（Apache-2.0），Lucide React（ISC），postgres.js（Unlicense）。
-
-## 当前阶段
-
-本次交付是第一版可部署开发基线，页面数据暂为验收示例。后续按开发说明逐模块接入真实 CRUD、登录会话、库存事务、自然语言解析和完整报表。
+核心依赖采用 MIT、Apache-2.0、ISC 或 Unlicense 等宽松许可证。

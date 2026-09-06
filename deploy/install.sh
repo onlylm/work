@@ -46,6 +46,15 @@ AUTH_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 INVENTORY_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
 EOF
 fi
+chmod 600 .env
+if ! grep -q '^ADMIN_EMAIL=' .env; then
+  admin_domain="${WORKBENCH_DOMAIN#www.}"
+  [[ -n "${admin_domain}" ]] || admin_domain="local"
+  echo "ADMIN_EMAIL=admin@${admin_domain}" >> .env
+fi
+if ! grep -q '^ADMIN_PASSWORD=' .env; then
+  echo "ADMIN_PASSWORD=$(openssl rand -hex 12)" >> .env
+fi
 
 # 查找 shuku/NIMAIL 已有的 Caddy，以及它所在的 Docker 网络和 domains 挂载目录。
 CADDY_CONTAINER=""
@@ -107,3 +116,7 @@ if [[ -n "${WORKBENCH_DOMAIN}" ]]; then
 else
   echo "尚未配置域名。重新运行时增加 WORKBENCH_DOMAIN=你的域名即可自动接入现有 Caddy。"
 fi
+echo
+echo "管理员账号：$(sed -n 's/^ADMIN_EMAIL=//p' .env)"
+echo "管理员密码：$(sed -n 's/^ADMIN_PASSWORD=//p' .env)"
+echo "请妥善保存密码，不要把服务器 .env 文件发送给他人。"

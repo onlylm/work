@@ -9,6 +9,9 @@ services:
       DATABASE_URL: postgres://workbench:${POSTGRES_PASSWORD}@db:5432/workbench
       AUTH_SECRET: ${AUTH_SECRET}
       INVENTORY_ENCRYPTION_KEY: ${INVENTORY_ENCRYPTION_KEY}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      TZ: Asia/Shanghai
     depends_on:
       db:
         condition: service_healthy

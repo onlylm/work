@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 /workbench
+/.local-pg
 /.pnp
 .pnp.*
 .yarn/*
