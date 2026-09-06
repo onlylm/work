@@ -1,0 +1,3 @@
+import {describe,expect,it} from "vitest";import {averageCost,consume,profit,recharge} from "./finance";
+describe("美元移动加权成本",()=>{it("跨期充值后按消费时快照结转",()=>{let p=recharge({usd:0,costCents:0},100,65000);expect(averageCost(p)).toBe(6.5);const used=consume(p,20);expect(used.costCents).toBe(13000);p=recharge(used.pool,100,75000);expect(averageCost(p)).toBeCloseTo(7.0556,4);expect(used.costCents).toBe(13000)});it("拒绝透支",()=>expect(()=>consume({usd:10,costCents:7000},11)).toThrow("余额不足"))});
+describe("利润",()=>{it("成本缺失返回待核算",()=>expect(profit(10000,null)).toBeNull());it("扣除成本支出退款",()=>expect(profit(20000,8000,1000,2000)).toBe(9000))});
