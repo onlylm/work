@@ -20,11 +20,19 @@ pnpm build
 
 ## 一键部署
 
+有独立域名时（推荐）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onlylm/work/main/deploy/install.sh | sudo WORKBENCH_DOMAIN=work.example.com bash
+```
+
+暂时只部署、不配置公网域名：
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/onlylm/work/main/deploy/install.sh | sudo bash
 ```
 
-默认仅监听 `127.0.0.1:8790`，不会与 NIMAIL 的 `127.0.0.1:8788` 冲突，也不会抢占 `shuku`/NIMAIL 共用的 80、443。把 `deploy/Caddyfile.example` 中的域名改为实际域名，加入现有 Caddy 配置即可使用 HTTPS。
+默认仅监听 `127.0.0.1:8790`，不会与 NIMAIL 的 `127.0.0.1:8788` 冲突，也不会抢占 `shuku`/NIMAIL 共用的 80、443。提供域名后，安装器会自动发现现有 Caddy 的 Docker 网络及配置目录，接入共享网关并启用 HTTPS。
 
 首次安装自动生成 `/opt/personal-workbench/.env`，密钥不会提交 Git。PostgreSQL 使用独立数据卷，备份容器每天生成压缩备份并保留 14 天。
 
