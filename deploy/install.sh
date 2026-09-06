@@ -90,7 +90,39 @@ EOF
   COMPOSE_ARGS+=(-f docker-compose.caddy.yml)
 fi
 
-docker compose "${COMPOSE_ARGS[@]}" up -d --build
+echo "正在构建应用镜像……"
+docker compose "${COMPOSE_ARGS[@]}" build app migrate
+
+echo "正在启动数据库……"
+docker compose "${COMPOSE_ARGS[@]}" up -d db
+
+echo "正在执行数据库迁移……"
+# 使用一次性容器强制执行迁移，避免已退出的 migrate 服务被 Compose 复用。
+docker compose "${COMPOSE_ARGS[@]}" run --rm migrate
+
+echo "正在验证数据库结构……"
+docker compose "${COMPOSE_ARGS[@]}" exec -T db \
+  psql -U workbench -d workbench -v ON_ERROR_STOP=1 -tAc \
+  "select to_regclass('public.users') is not null and to_regclass('public.workspaces') is not null and to_regclass('public.business_records') is not null" \
+  | grep -qx 't'
+
+echo "正在启动应用……"
+docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate app backup
+
+echo "正在检查应用健康状态……"
+healthy=0
+for _ in $(seq 1 30); do
+  if curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" | grep -q '"ok":true'; then
+    healthy=1
+    break
+  fi
+  sleep 2
+done
+if [[ ${healthy} -ne 1 ]]; then
+  echo "应用健康检查失败，最近日志如下：" >&2
+  docker compose "${COMPOSE_ARGS[@]}" logs --tail=100 app migrate db >&2
+  exit 3
+fi
 
 if [[ -n "${WORKBENCH_DOMAIN}" ]]; then
   if [[ -z "${CADDY_CONTAINER}" || -z "${CADDY_DOMAINS_DIR}" ]]; then
