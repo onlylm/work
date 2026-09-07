@@ -58,7 +58,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: npm install --no-save @playwright/test@1.55.0
-      - run: npx playwright install chromium --with-deps
+      - run: pnpm exec playwright install chromium --with-deps
       - run: pnpm build
-      - run: npx playwright test
+      - run: pnpm test:e2e
