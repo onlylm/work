@@ -5,11 +5,12 @@ import {revalidatePath} from "next/cache";
 import {redirect} from "next/navigation";
 import {z} from "zod";
 import {getDb} from "@/db";
-import {auditLogs,businessRecords,customers,financeTransactions,products,tasks,usdTransactions,websites} from "@/db/schema";
+import {auditLogs,businessRecords,customers,financeTransactions,membershipRenewals,membershipSubscriptions,products,tasks,usdTransactions,websites} from "@/db/schema";
 import {requireSession} from "@/lib/auth";
 import {actionError,fail,ok,type ActionResult} from "@/lib/action-result";
 import {syncBusinessFinance,syncCustomerLastBusiness} from "@/lib/business-ops";
 import {optionalUuid,parseMoney,parseRequiredMoney,parseWhen,requiredUuid,text} from "@/lib/form-parse";
+import {syncMembershipReminderTasks} from "@/lib/membership";
 import {averageCost,consume,profit,recharge} from "@/lib/finance";
 
 async function audit(action:string,entityType:string,entityId:string){
@@ -348,5 +349,90 @@ export async function createUsd(data:FormData){
     result=ok("美元流水已记录");
   }catch(e){result=fail(actionError(e))}
   finish("/finance",result);
+}
+
+export async function createMembership(data:FormData){
+  let result:ActionResult;
+  let createdId="";
+  try{
+    const s=await requireSession();
+    const p=z.object({customerId:text(1,36),platform:text(1,80),planName:text(1,120),startedAt:z.string().optional(),expiresAt:z.string().min(1),notes:z.string().trim().max(1000)}).parse(Object.fromEntries(data));
+    const customerId=requiredUuid(p.customerId,"客户");
+    await assertCustomer(s.workspaceId,customerId);
+    const startedAt=parseWhen(p.startedAt??null);
+    const expiresAt=parseWhen(p.expiresAt);
+    if(expiresAt<=startedAt)throw new Error("到期时间必须晚于开始时间");
+    const revenue=parseRequiredMoney(data.get("revenue")??"0","售价");
+    const cost=parseMoney(data.get("cost"),"成本");
+    const [row]=await getDb().insert(membershipSubscriptions).values({workspaceId:s.workspaceId,customerId,platform:p.platform,planName:p.planName,startedAt,expiresAt,revenueCents:revenue,costCents:cost,status:"active",notes:p.notes||null}).returning({id:membershipSubscriptions.id});
+    createdId=row.id;
+    await audit("create","membership",row.id);
+    await syncMembershipReminderTasks(s.workspaceId);
+    result=ok("会员订阅已保存");
+  }catch(e){result=fail(actionError(e))}
+  finish(createdId?[`/memberships/${createdId}`,"/memberships","/dashboard"]:["/memberships","/dashboard"],result);
+}
+
+export async function updateMembership(data:FormData){
+  let result:ActionResult;
+  const rawId=String(data.get("id")??"");
+  try{
+    const s=await requireSession();
+    const id=requiredUuid(data.get("id"),"会员");
+    const p=z.object({customerId:text(1,36),platform:text(1,80),planName:text(1,120),startedAt:z.string().optional(),expiresAt:z.string().min(1),status:z.enum(["active","expired","cancelled"]),notes:z.string().trim().max(1000)}).parse(Object.fromEntries(data));
+    const customerId=requiredUuid(p.customerId,"客户");
+    await assertCustomer(s.workspaceId,customerId);
+    const startedAt=parseWhen(p.startedAt??null);
+    const expiresAt=parseWhen(p.expiresAt);
+    if(expiresAt<=startedAt)throw new Error("到期时间必须晚于开始时间");
+    const revenue=parseRequiredMoney(data.get("revenue")??"0","售价");
+    const cost=parseMoney(data.get("cost"),"成本");
+    const updated=await getDb().update(membershipSubscriptions).set({customerId,platform:p.platform,planName:p.planName,startedAt,expiresAt,revenueCents:revenue,costCents:cost,status:p.status,notes:p.notes||null,updatedAt:new Date()}).where(and(eq(membershipSubscriptions.id,id),eq(membershipSubscriptions.workspaceId,s.workspaceId))).returning({id:membershipSubscriptions.id});
+    if(!updated[0])throw new Error("会员订阅不存在或无权修改");
+    await audit("update","membership",id);
+    await syncMembershipReminderTasks(s.workspaceId);
+    result=ok("会员订阅已更新");
+  }catch(e){result=fail(actionError(e))}
+  finish(rawId?[`/memberships/${rawId}`,"/memberships","/dashboard"]:["/memberships","/dashboard"],result);
+}
+
+export async function renewMembership(data:FormData){
+  let result:ActionResult;
+  const rawId=String(data.get("id")??"");
+  try{
+    const s=await requireSession();
+    const id=requiredUuid(data.get("id"),"会员");
+    const p=z.object({newExpiresAt:z.string().min(1),notes:z.string().trim().max(1000)}).parse(Object.fromEntries(data));
+    const newExpiresAt=parseWhen(p.newExpiresAt);
+    const revenue=parseRequiredMoney(data.get("revenue")??"0","续费售价");
+    const cost=parseMoney(data.get("cost"),"续费成本");
+    const db=getDb();
+    const [existing]=await db.select().from(membershipSubscriptions).where(and(eq(membershipSubscriptions.id,id),eq(membershipSubscriptions.workspaceId,s.workspaceId)));
+    if(!existing)throw new Error("会员订阅不存在或无权续费");
+    if(newExpiresAt<=existing.expiresAt)throw new Error("续费后的到期时间必须晚于当前到期时间");
+    await db.transaction(async tx=>{
+      await tx.insert(membershipRenewals).values({workspaceId:s.workspaceId,subscriptionId:id,renewedAt:new Date(),previousExpiresAt:existing.expiresAt,newExpiresAt,revenueCents:revenue,costCents:cost,notes:p.notes||null});
+      await tx.update(membershipSubscriptions).set({expiresAt:newExpiresAt,status:"active",revenueCents:existing.revenueCents+revenue,costCents:(existing.costCents??0)+(cost??0),updatedAt:new Date()}).where(and(eq(membershipSubscriptions.id,id),eq(membershipSubscriptions.workspaceId,s.workspaceId)));
+    });
+    await audit("renew","membership",id);
+    await syncMembershipReminderTasks(s.workspaceId);
+    result=ok("续费已记录");
+  }catch(e){result=fail(actionError(e))}
+  finish(rawId?[`/memberships/${rawId}`,"/memberships","/dashboard"]:["/memberships","/dashboard"],result);
+}
+
+export async function deleteMembership(data:FormData){
+  let result:ActionResult;
+  try{
+    const s=await requireSession();
+    const id=requiredUuid(data.get("id"),"会员");
+    const db=getDb();
+    await db.delete(membershipRenewals).where(and(eq(membershipRenewals.subscriptionId,id),eq(membershipRenewals.workspaceId,s.workspaceId)));
+    const removed=await db.delete(membershipSubscriptions).where(and(eq(membershipSubscriptions.id,id),eq(membershipSubscriptions.workspaceId,s.workspaceId))).returning({id:membershipSubscriptions.id});
+    if(!removed[0])throw new Error("会员订阅不存在或无权删除");
+    await audit("delete","membership",id);
+    result=ok("会员订阅已删除");
+  }catch(e){result=fail(actionError(e))}
+  finish(["/memberships","/dashboard"],result);
 }
 

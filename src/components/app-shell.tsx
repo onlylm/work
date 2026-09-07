@@ -18,7 +18,7 @@ const groups:NavGroup[]=[
     {href:"/tasks",label:"待办提醒",icon:CalendarCheck},
   ]},
   {title:"商品与交付",items:[
-    {href:"/memberships",label:"会员充值",icon:CreditCard},
+    {href:"/memberships",label:"会员管理",icon:CreditCard},
     {href:"/products",label:"商品库存",icon:Boxes},
     {href:"/deliveries",label:"账号交付",icon:PackageCheck,disabled:true,badge:"未启用"},
   ]},
@@ -34,7 +34,7 @@ const titles=Object.fromEntries(groups.flatMap(g=>g.items.map(i=>[i.href,i.label
 export function AppShell({children,user}:{children:React.ReactNode;user:{name:string;email:string}}){
   const path=usePathname();
   const [open,setOpen]=useState(false);
-  const title=titles[path]??(path.startsWith("/customers/")?"客户详情":path.startsWith("/business/")?"业务详情":"经营工作台");
+  const title=titles[path]??(path.startsWith("/customers/")?"客户详情":path.startsWith("/business/")?"业务详情":path.startsWith("/memberships/")?"会员详情":path.startsWith("/products/")?"商品详情":"经营工作台");
   return <div className="app">
     <aside className={open?"app-side open":"app-side"}>
       <div className="app-brand">

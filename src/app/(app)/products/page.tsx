@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {desc,eq} from "drizzle-orm";
 import {getDb} from "@/db";
 import {products} from "@/db/schema";
@@ -48,8 +49,8 @@ export default async function ProductsPage({searchParams}:{searchParams:Promise<
     <section className="content-card list-card">
       <header><div><h3>全部商品</h3><p>共 {total} 个商品</p></div></header>
       <ListToolbar action="/products" search={q} page={page} totalPages={totalPages} placeholder="搜索商品名称或分类"/>
-      {rows.length?<div className="data-table"><table><thead><tr><th>商品名称</th><th>类型</th><th>分类</th><th>默认售价</th><th>默认成本</th><th>安全库存</th><th>状态</th><th>操作</th></tr></thead><tbody>
-        {rows.map(x=><tr key={x.id} className={x.enabled?"":"muted-row"}><td><b>{x.name}</b></td><td>{businessTypeName[x.type]}</td><td>{x.category||"—"}</td><td>{cny(x.defaultPriceCents)}</td><td>{cny(x.defaultCostCents)}</td><td>{x.safetyStock}</td><td>{x.enabled?"启用":"已归档"}</td><td className="row-actions"><details><summary>编辑</summary>
+      {rows.length?<div className="data-table"><table><thead><tr><th>商品名称</th><th>类型</th><th>分类</th><th>库存</th><th>默认售价</th><th>状态</th><th>操作</th></tr></thead><tbody>
+        {rows.map(x=><tr key={x.id} className={x.enabled?"":"muted-row"}><td><Link href={`/products/${x.id}`}><b>{x.name}</b></Link></td><td>{businessTypeName[x.type]}</td><td>{x.category||"—"}</td><td>{x.type==="physical"?`${x.stockQuantity} 件`:x.type==="account"?"卡密": "—"}</td><td>{cny(x.defaultPriceCents)}</td><td>{x.enabled?"启用":"已归档"}</td><td className="row-actions"><Link href={`/products/${x.id}`}>详情</Link><details><summary>编辑</summary>
           <form action={updateProduct} className="data-form inline-form">
             <input type="hidden" name="id" value={x.id}/>
             <label>商品名称<input name="name" required defaultValue={x.name}/></label>

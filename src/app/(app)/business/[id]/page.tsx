@@ -2,13 +2,15 @@ import Link from "next/link";
 import {notFound} from "next/navigation";
 import {and,eq} from "drizzle-orm";
 import {getDb} from "@/db";
-import {businessRecords,customers,financeTransactions,products} from "@/db/schema";
+import {businessRecords,customers,financeTransactions,inventoryItems,products} from "@/db/schema";
 import {requireSession} from "@/lib/auth";
 import {businessStatusName,businessTypeName,cny,datetime,datetimeLocal} from "@/lib/format";
+import {countInventory} from "@/lib/inventory";
 import {BusinessCreateForm} from "@/components/business-create-form";
 import {ConfirmSubmitButton} from "@/components/delete-button";
 import {FlashBanner} from "@/components/flash-banner";
 import {PageHeader} from "@/components/ui";
+import {claimInventory} from "../../inventory-actions";
 import {deleteBusiness,updateBusiness} from "../../actions";
 
 export const dynamic="force-dynamic";
@@ -27,7 +29,10 @@ export default async function BusinessDetailPage({params,searchParams}:{params:P
   ]);
   const editProducts=productRows.filter(p=>p.enabled||p.id===row.productId).map(p=>({id:p.id,name:p.enabled?p.name:`${p.name}（已归档）`,type:p.type,defaultPriceCents:p.defaultPriceCents,defaultCostCents:p.defaultCostCents}));
   const customerName=clientRows.find(c=>c.id===row.customerId)?.name;
-  const productName=productRows.find(p=>p.id===row.productId)?.name;
+  const product=productRows.find(p=>p.id===row.productId);
+  const productName=product?.name;
+  const linkedInventory=row.productId?await db.select({id:inventoryItems.id,status:inventoryItems.status,revealedAt:inventoryItems.revealedAt}).from(inventoryItems).where(and(eq(inventoryItems.workspaceId,s.workspaceId),eq(inventoryItems.businessId,id))):[];
+  const availableCount=row.productId&&product?.type==="account"?await countInventory(s.workspaceId,row.productId,"available"):0;
   return <div className="page">
     <PageHeader title={row.content} description={`编号 ${row.number}`}/>
     <FlashBanner success={success} error={error}/>
@@ -49,6 +54,14 @@ export default async function BusinessDetailPage({params,searchParams}:{params:P
           <h4>关联收款流水</h4>
           {receipts.length?receipts.map(x=><p key={x.id}>{cny(x.amountCents)} · {datetime(x.occurredAt)} · {x.notes||"客户收款"}</p>):<p className="muted">无自动生成的收款流水</p>}
         </div>
+        {product?.type==="account"&&row.productId&&<div className="detail-receipts">
+          <h4>账号/卡密交付</h4>
+          {linkedInventory.length?linkedInventory.map(x=><p key={x.id}>库存 #{x.id} · {x.revealedAt?"已查看":"待查看"} · <Link href={`/business/${id}/reveal/${x.id}`}>{x.revealedAt?"查看记录":"查看内容"}</Link></p>):<>
+            <p className="muted">可用库存 {availableCount} 条</p>
+            {availableCount>0&&<form action={claimInventory} className="inline-claim"><input type="hidden" name="businessId" value={id}/><input type="hidden" name="productId" value={row.productId}/><button type="submit" className="main-button">领取一条库存并交付</button></form>}
+            {availableCount===0&&<p className="muted">请先在 <Link href={`/products/${row.productId}`}>商品详情</Link> 导入加密库存</p>}
+          </>}
+        </div>}
       </section>
       <section className="content-card">
         <header><div><h3>编辑业务</h3><p>修改后会同步收款流水与客户最近业务时间</p></div></header>
