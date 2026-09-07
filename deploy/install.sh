@@ -91,7 +91,14 @@ EOF
 fi
 
 echo "正在构建应用镜像……"
-docker compose "${COMPOSE_ARGS[@]}" build app migrate
+WORKBENCH_IMAGE_VALUE=$(sed -n 's/^WORKBENCH_IMAGE=//p' .env 2>/dev/null || true)
+if [[ -n "${WORKBENCH_IMAGE_VALUE}" ]]; then
+  echo "使用预构建镜像：${WORKBENCH_IMAGE_VALUE}"
+  docker compose "${COMPOSE_ARGS[@]}" pull app || true
+  docker compose "${COMPOSE_ARGS[@]}" build migrate
+else
+  docker compose "${COMPOSE_ARGS[@]}" build app migrate
+fi
 
 echo "正在启动数据库……"
 docker compose "${COMPOSE_ARGS[@]}" up -d db
@@ -122,6 +129,10 @@ if [[ ${healthy} -ne 1 ]]; then
   echo "应用健康检查失败，最近日志如下：" >&2
   docker compose "${COMPOSE_ARGS[@]}" logs --tail=100 app migrate db >&2
   exit 3
+fi
+
+if [[ -x deploy/smoke.sh ]]; then
+  BASE_URL="http://127.0.0.1:${APP_PORT}" ADMIN_EMAIL="$(sed -n 's/^ADMIN_EMAIL=//p' .env)" ADMIN_PASSWORD="$(sed -n 's/^ADMIN_PASSWORD=//p' .env)" bash deploy/smoke.sh
 fi
 
 if [[ -n "${WORKBENCH_DOMAIN}" ]]; then

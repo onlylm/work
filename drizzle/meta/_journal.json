@@ -22,6 +22,27 @@
       "when": 1788685267487,
       "tag": "0002_violet_magma",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788690000000,
+      "tag": "0003_membership_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788693600000,
+      "tag": "0004_inventory_stock",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788697200000,
+      "tag": "0005_session_version",
+      "breakpoints": true
     }
   ]
 }
