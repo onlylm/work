@@ -1,5 +1,6 @@
 services:
   app:
+    image: ${WORKBENCH_IMAGE:-personal-workbench-app}
     build:
       context: .
       args:
@@ -11,7 +12,18 @@ services:
       INVENTORY_ENCRYPTION_KEY: ${INVENTORY_ENCRYPTION_KEY}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      BACKUP_DIR: /backups
+      SHUKU_API_URL: ${SHUKU_API_URL:-}
+      SHUKU_API_KEY: ${SHUKU_API_KEY:-}
+      SHUKU_HEALTH_PATH: ${SHUKU_HEALTH_PATH:-/api/health}
+      SHUKU_AUTH_STYLE: ${SHUKU_AUTH_STYLE:-bearer}
+      NIMAIL_API_URL: ${NIMAIL_API_URL:-}
+      NIMAIL_API_KEY: ${NIMAIL_API_KEY:-}
+      NIMAIL_HEALTH_PATH: ${NIMAIL_HEALTH_PATH:-/api/health}
+      NIMAIL_AUTH_STYLE: ${NIMAIL_AUTH_STYLE:-bearer}
       TZ: Asia/Shanghai
+    volumes:
+      - workbench_backups:/backups:ro
     depends_on:
       db:
         condition: service_healthy

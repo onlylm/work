@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run src/**/*.integration.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "npm install --no-save @playwright/test@1.55.0 && playwright install chromium",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },

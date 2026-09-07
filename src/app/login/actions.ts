@@ -20,7 +20,7 @@ export async function loginAction(formData:FormData){
   await db.delete(loginAttempts).where(eq(loginAttempts.email,email));
   const [member]=await db.select().from(workspaceMembers).where(eq(workspaceMembers.userId,user.id)).limit(1);
   if(!member)redirect("/login?error=账号尚未加入工作空间");
-  await createSession({userId:user.id,workspaceId:member.workspaceId,name:user.name,email:user.email});
+  await createSession({userId:user.id,workspaceId:member.workspaceId,name:user.name,email:user.email,sessionVersion:user.sessionVersion});
   redirect("/dashboard");
 }
 export async function logoutAction(){await clearSession();redirect("/login")}
